@@ -18,9 +18,20 @@ async function copyFolder() {
 
   const files = await fs.readdir(sourcePath);
   for (const file of files) {
-    const sourceFilePath = path.join(sourcePath, file);
+    const filePath = path.join(sourcePath, file);
+    const stats = await fs.stat(filePath, (err, stats) => {
+      if (err) {
+        console.error(err);
+        return;
+      }
+    });
+
+    if (stats.isFile()) {
+      const sourceFilePath = path.join(sourcePath, file);
     const destinationFilePath = path.join(destinationPath, file);
-    await fs.copyFile(sourceFilePath, destinationFilePath);
+    await fs.copyFile(sourceFilePath, destinationFilePath);;
+    }
+    
   }
 }
 
