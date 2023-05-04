@@ -1,64 +1,61 @@
 const fs = require("fs").promises;
 const path = require("path");
 
-const destinationPath = path.join(__dirname, "project-dist");
+const projectBuildFolder = path.join(__dirname, "project-dist");
+const sourceAssets = path.join(__dirname, "assets");
+const projectBuildAssets = path.join(projectBuildFolder, "assets");
+const fileTemplate = path.join(__dirname, "template.html");
+const fileBuildHtml = path.join(projectBuildFolder, "index.html");
+const sourceComponents = path.join(__dirname, "components");
+const sourceStyles = path.join(__dirname, "styles");
 
-async function makePage(){
-  
-  const destinationExists = await fs.stat(destinationPath)
-    .then(stats => stats.isDirectory())
+async function buildPage() {
+  const destinationExists = await fs
+    .stat(projectBuildFolder)
+    .then((stats) => stats.isDirectory())
     .catch(() => console.log("Create folder 'project-dist'"));
 
   if (destinationExists) {
-    await removeDir(destinationPath);
+    await removeFolder(projectBuildFolder);
   }
 
-  await fs.mkdir(destinationPath);
+  await fs.mkdir(projectBuildFolder);
 
-  await replaceModule()
-  await bundleCss()
-  await copyFolder(sourceAssets, destinationAssets)
-  await console.log("Copy folder 'assets'")
+  await buildIndexHtml();
+  await buildStylesCss();
+  await copyFolder(sourceAssets, projectBuildAssets);
+  console.log("Copy folder 'assets'");
 }
 
-async function replaceModule() {
+async function buildIndexHtml() {
+  await fs.copyFile(fileTemplate, fileBuildHtml);
 
-  
-  const fileTemplate = path.join(__dirname, "template.html");
-  const filePath = path.join(destinationPath, "index.html");
-  
-  await fs.copyFile(fileTemplate, filePath);
-
-  const sourcePath = path.join(__dirname, "components");
-  const files = await fs.readdir(sourcePath);
+  const files = await fs.readdir(sourceComponents);
 
   for (const file of files) {
-    const content = await fs.readFile(path.join(sourcePath, file), "utf-8");
-    const fileContent = await fs.readFile(filePath, "utf-8");
+    const content = await fs.readFile(
+      path.join(sourceComponents, file),
+      "utf-8"
+    );
+    const fileContent = await fs.readFile(fileBuildHtml, "utf-8");
     const basename = path.basename(file, path.extname(file));
     const replacedContent = fileContent.replace(`{{${basename}}}`, content);
-    await fs.writeFile(filePath, replacedContent, "utf-8");
+    await fs.writeFile(fileBuildHtml, replacedContent, "utf-8");
   }
-  return console.log('Page layout complete')
+  return console.log("Page layout complete");
 }
 
-
-
-const sourcePath = path.join(__dirname, "styles");
-
-
-async function bundleCss() {
-  const sourcePath = path.join(__dirname, "styles");
+async function buildStylesCss() {
   try {
-    await fs.writeFile(path.join(destinationPath, "style.css"), "");
+    await fs.writeFile(path.join(projectBuildFolder, "style.css"), "");
 
-    const files = await fs.readdir(sourcePath);
+    const files = await fs.readdir(sourceStyles);
     const stylesArr = await Promise.all(
       files.map(async (file) => {
-        const filePath = path.join(sourcePath, file);
+        const fileBuildHtml = path.join(sourceStyles, file);
         const extension = path.extname(file);
 
-        const stats = await fs.stat(filePath, (err, stats) => {
+        const stats = await fs.stat(fileBuildHtml, (err, stats) => {
           if (err) {
             console.error(err);
             return;
@@ -69,50 +66,47 @@ async function bundleCss() {
           return "";
         }
 
-        const content = fs.readFile(filePath, "utf-8");
+        const content = fs.readFile(fileBuildHtml, "utf-8");
         return content;
       })
     );
 
     await fs.appendFile(
-      path.join(destinationPath, "style.css"),
+      path.join(projectBuildFolder, "style.css"),
       stylesArr.join("")
     );
 
-    console.log("Styles bundled successfully");
+    console.log("Page styles complete");
   } catch (err) {
     console.error("Error bundling styles:", err);
   }
 }
 
-makePage()
+buildPage();
 
-
-async function removeDir(dirPath) {
-  const files = await fs.readdir(dirPath);
+async function removeFolder(folderPath) {
+  const files = await fs.readdir(folderPath);
   for (const file of files) {
-    const filePath = path.join(dirPath, file);
+    const filePath = path.join(folderPath, file);
     const fileStats = await fs.stat(filePath);
     if (fileStats.isDirectory()) {
-      await removeDir(filePath);
+      await removeFolder(filePath);
     } else {
       await fs.unlink(filePath);
     }
   }
 
-  await fs.rmdir(dirPath);
+  await fs.rmdir(folderPath);
 }
 
-const sourceAssets = path.join(__dirname, "assets");
-const destinationAssets = path.join(destinationPath, "assets");
-
 async function copyFolder(sourceFolder, destinationFolder) {
-  const destinationExists = await fs.stat(destinationFolder)
-    .then(stats => stats.isDirectory())
+  const destinationExists = await fs
+    .stat(destinationFolder)
+    .then((stats) => stats.isDirectory())
     .catch(() => false);
 
   if (destinationExists) {
-    await removeDir(destinationFolder);
+    await removeFolder(destinationFolder);
   }
 
   await fs.mkdir(destinationFolder);
@@ -129,15 +123,14 @@ async function copyFolder(sourceFolder, destinationFolder) {
 
     if (stats.isFile()) {
       const sourceFilePath = path.join(sourceFolder, file);
-    const destinationFilePath = path.join(destinationFolder, file);
-    await fs.copyFile(sourceFilePath, destinationFilePath);;
+      const destinationFilePath = path.join(destinationFolder, file);
+      await fs.copyFile(sourceFilePath, destinationFilePath);
     }
 
     if (!stats.isFile()) {
       const sourceFolderPath = path.join(sourceFolder, file);
       const destinationFolderPath = path.join(destinationFolder, file);
-      copyFolder(sourceFolderPath, destinationFolderPath)
+      copyFolder(sourceFolderPath, destinationFolderPath);
     }
-    
   }
 }
